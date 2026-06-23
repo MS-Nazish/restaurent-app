@@ -52,9 +52,15 @@ function BillPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="text-center">
-          <div className="text-6xl mb-4">✅</div>
+          <div className="text-5xl mb-4">OK</div>
           <h1 className="text-2xl font-bold text-gray-800">Bill Requested!</h1>
           <p className="text-gray-500 mt-2">Your waiter will be with you shortly.</p>
+          <a
+            href={'/feedback/' + orderId}
+            className="mt-6 inline-block bg-amber-500 text-white px-6 py-3 rounded-xl font-semibold"
+          >
+            Leave Feedback
+          </a>
         </div>
       </div>
     )
@@ -99,9 +105,7 @@ function BillPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
-            {error}
-          </div>
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{error}</div>
         )}
 
         <button

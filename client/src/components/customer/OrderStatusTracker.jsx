@@ -18,14 +18,14 @@ export default function OrderStatusTracker({ status }) {
   }
 
   return (
-    <div className="bg-amber-500 text-white px-4 py-4">
+    <div className="relative px-2 py-4">
       <div className="absolute top-9 left-7 right-7 h-0.5 bg-slate-100" />
       <div
         className="absolute top-9 left-7 h-0.5 bg-amber-400 transition-all duration-700"
         style={{ width: getWidth() }}
       />
       <div className="relative flex justify-between">
-        {STEPS.map((step, index) => {
+        {STEPS.map(function(step, index) {
           const isDone = index < currentIndex
           const isActive = index === currentIndex
           const isPending = index > currentIndex
@@ -44,7 +44,7 @@ export default function OrderStatusTracker({ status }) {
             <div key={step.key} className="flex flex-col items-center">
               <div className={circleClass}>
                 {isDone ? (
-                  <span className="text-white text-sm font-bold">✓</span>
+                  <span className="text-white text-sm font-bold">v</span>
                 ) : (
                   <span className={isPending ? 'text-slate-300 text-sm' : 'text-slate-600 text-sm font-semibold'}>
                     {index + 1}
