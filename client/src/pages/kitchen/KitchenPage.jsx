@@ -11,11 +11,11 @@ function timeElapsed(createdAt) {
 function TimerBadge({ createdAt }) {
   const [elapsed, setElapsed] = useState(timeElapsed(createdAt))
 
-  useEffect(() => {
-    const interval = setInterval(() => {
+  useEffect(function() {
+    const interval = setInterval(function() {
       setElapsed(timeElapsed(createdAt))
     }, 1000)
-    return () => clearInterval(interval)
+    return function() { clearInterval(interval) }
   }, [createdAt])
 
   const color =
@@ -32,56 +32,59 @@ function TimerBadge({ createdAt }) {
   )
 }
 
-function OrderCard({ order, onMarkPreparing, onMarkReady }) {
+function OrderCard({ order, onMarkPreparing, onMarkReady, onMarkServed }) {
   const isReceived = order.status === 'received'
   const isPreparing = order.status === 'preparing'
+  const isReady = order.status === 'ready'
+
+  const borderColor = isReceived ? 'border-blue-400' : isReady ? 'border-green-400' : 'border-amber-400'
+  const headerColor = isReceived ? 'bg-blue-50' : isReady ? 'bg-green-50' : 'bg-amber-50'
 
   return (
-    <div className={'rounded-xl border-2 bg-white overflow-hidden ' + (isReceived ? 'border-blue-400' : 'border-amber-400')}>
-      
-      {/* Card Header */}
-      <div className={'px-4 py-3 flex items-center justify-between ' + (isReceived ? 'bg-blue-50' : 'bg-amber-50')}>
+    <div className={'rounded-xl border-2 bg-white overflow-hidden ' + borderColor}>
+      <div className={'px-4 py-3 flex items-center justify-between ' + headerColor}>
         <div>
           <p className="text-sm font-bold text-slate-800">
-            Table {order.tables?.table_number}
+            Table {order.tables ? order.tables.table_number : '?'}
           </p>
           <p className="text-xs text-slate-500 mt-0.5">
             Order #{order.id.slice(-6).toUpperCase()}
           </p>
+          {isReady && (
+            <p className="text-xs text-green-600 font-semibold mt-0.5">Ready to serve</p>
+          )}
         </div>
         <TimerBadge createdAt={order.created_at} />
       </div>
 
-      {/* Items */}
       <div className="px-4 py-3 space-y-2">
-        {order.order_items.map((item) => (
-          <div key={item.id} className="flex items-start gap-2">
-            <span className="text-sm font-bold text-slate-800 min-w-6">
-              {item.quantity}x
-            </span>
-            <div>
-              <p className="text-sm font-medium text-slate-800">
-                {item.item_name}
-              </p>
-              {item.variant && (
-                <p className="text-xs text-slate-400">{item.variant}</p>
-              )}
-              {Array.isArray(item.addons) && item.addons.length > 0 && (
-                <p className="text-xs text-slate-400">+ {item.addons.join(', ')}</p>
-              )}
-              {item.notes && (
-                <p className="text-xs text-amber-600 italic">Note: {item.notes}</p>
-              )}
+        {order.order_items.map(function(item) {
+          return (
+            <div key={item.id} className="flex items-start gap-2">
+              <span className="text-sm font-bold text-slate-800 min-w-6">
+                {item.quantity}x
+              </span>
+              <div>
+                <p className="text-sm font-medium text-slate-800">{item.item_name}</p>
+                {item.variant && (
+                  <p className="text-xs text-slate-400">{item.variant}</p>
+                )}
+                {Array.isArray(item.addons) && item.addons.length > 0 && (
+                  <p className="text-xs text-slate-400">+ {item.addons.join(', ')}</p>
+                )}
+                {item.notes && (
+                  <p className="text-xs text-amber-600 italic">Note: {item.notes}</p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
-      {/* Action Button */}
       <div className="px-4 pb-4">
         {isReceived && (
           <button
-            onClick={() => onMarkPreparing(order.id)}
+            onClick={function() { onMarkPreparing(order.id) }}
             className="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
           >
             Start Preparing
@@ -89,10 +92,18 @@ function OrderCard({ order, onMarkPreparing, onMarkReady }) {
         )}
         {isPreparing && (
           <button
-            onClick={() => onMarkReady(order.id)}
+            onClick={function() { onMarkReady(order.id) }}
             className="w-full bg-green-500 hover:bg-green-600 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
           >
             Mark as Ready
+          </button>
+        )}
+        {isReady && (
+          <button
+            onClick={function() { onMarkServed(order.id) }}
+            className="w-full bg-slate-500 hover:bg-slate-600 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
+          >
+            Mark as Served
           </button>
         )}
       </div>
@@ -104,32 +115,18 @@ export default function KitchenPage() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const fetchOrders = async () => {
+  async function fetchOrders() {
     const { data, error } = await supabase
       .from('orders')
-      .select(`
-        id,
-        status,
-        created_at,
-        table_id,
-        tables ( table_number ),
-        order_items (
-          id,
-          quantity,
-          item_name,
-          variant,
-          addons,
-          notes
-        )
-      `)
-      .in('status', ['received', 'preparing'])
+      .select('id, status, created_at, table_id, tables ( table_number ), order_items ( id, quantity, item_name, variant, addons, notes )')
+      .in('status', ['received', 'preparing', 'ready'])
       .order('created_at', { ascending: true })
 
     if (!error) setOrders(data || [])
     setLoading(false)
   }
 
-  useEffect(() => {
+  useEffect(function() {
     fetchOrders()
 
     const channel = supabase
@@ -137,14 +134,14 @@ export default function KitchenPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
-        () => fetchOrders()
+        function() { fetchOrders() }
       )
       .subscribe()
 
-    return () => supabase.removeChannel(channel)
+    return function() { supabase.removeChannel(channel) }
   }, [])
 
- async function updateStatus(orderId, status) {
+  async function updateStatus(orderId, status) {
     await fetch(
       import.meta.env.VITE_API_URL + '/api/orders/' + orderId + '/status',
       {
@@ -156,11 +153,13 @@ export default function KitchenPage() {
     fetchOrders()
   }
 
-  const handleMarkPreparing = (orderId) => updateStatus(orderId, 'preparing')
-  const handleMarkReady = (orderId) => updateStatus(orderId, 'ready')
+  const handleMarkPreparing = function(orderId) { updateStatus(orderId, 'preparing') }
+  const handleMarkReady = function(orderId) { updateStatus(orderId, 'ready') }
+  const handleMarkServed = function(orderId) { updateStatus(orderId, 'served') }
 
-  const receivedOrders = orders.filter((o) => o.status === 'received')
-  const preparingOrders = orders.filter((o) => o.status === 'preparing')
+  const receivedOrders = orders.filter(function(o) { return o.status === 'received' })
+  const preparingOrders = orders.filter(function(o) { return o.status === 'preparing' })
+  const readyOrders = orders.filter(function(o) { return o.status === 'ready' })
 
   if (loading) {
     return (
@@ -171,14 +170,12 @@ export default function KitchenPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
-      
-      {/* Header */}
+    <div className="min-h-screen bg-slate-900 p-4 lg:p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-white">Kitchen Display</h1>
           <p className="text-slate-400 text-sm mt-0.5">
-            {receivedOrders.length} new, {preparingOrders.length} preparing
+            {receivedOrders.length} new, {preparingOrders.length} preparing, {readyOrders.length} ready
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -190,6 +187,10 @@ export default function KitchenPage() {
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
             Preparing ({preparingOrders.length})
           </span>
+          <span className="flex items-center gap-1.5 text-xs text-green-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-green-400 inline-block" />
+            Ready ({readyOrders.length})
+          </span>
         </div>
       </div>
 
@@ -200,14 +201,17 @@ export default function KitchenPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {orders.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              onMarkPreparing={handleMarkPreparing}
-              onMarkReady={handleMarkReady}
-            />
-          ))}
+          {orders.map(function(order) {
+            return (
+              <OrderCard
+                key={order.id}
+                order={order}
+                onMarkPreparing={handleMarkPreparing}
+                onMarkReady={handleMarkReady}
+                onMarkServed={handleMarkServed}
+              />
+            )
+          })}
         </div>
       )}
     </div>

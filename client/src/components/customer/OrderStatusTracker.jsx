@@ -1,3 +1,6 @@
+import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
+
 const STEPS = [
   { key: 'received', label: 'Received' },
   { key: 'preparing', label: 'Preparing' },
@@ -7,10 +10,10 @@ const STEPS = [
 
 const ORDER = ['received', 'preparing', 'ready', 'served']
 
-export default function OrderStatusTracker({ status }) {
+function StatusTracker({ status }) {
   const currentIndex = ORDER.indexOf(status)
 
-  const getWidth = () => {
+  function getWidth() {
     if (currentIndex <= 0) return '0%'
     if (currentIndex === 1) return '33%'
     if (currentIndex === 2) return '66%'
@@ -59,3 +62,110 @@ export default function OrderStatusTracker({ status }) {
     </div>
   )
 }
+
+function OrderStatusTracker({ sessionId }) {
+  const [order, setOrder] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(function() {
+    if (!sessionId) return
+    fetchOrder()
+
+    const channel = supabase
+      .channel('order-' + sessionId)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: 'customer_session_id=eq.' + sessionId,
+        },
+        function(payload) {
+          setOrder(function(prev) { return { ...prev, ...payload.new } })
+        }
+      )
+      .subscribe()
+
+    return function() { supabase.removeChannel(channel) }
+  }, [sessionId])
+
+  async function fetchOrder() {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .eq('customer_session_id', sessionId)
+        .single()
+      if (error) throw error
+      setOrder(data)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-gray-500">Loading order status...</p>
+      </div>
+    )
+  }
+
+  if (error || !order) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-red-500">Order not found.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <h2 className="font-bold text-gray-800 text-lg mb-4">Order Progress</h2>
+        <StatusTracker status={order.status} />
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <h2 className="font-bold text-gray-800 text-lg mb-4">Your Order</h2>
+        <div className="space-y-3">
+          {order.order_items && order.order_items.map(function(item) {
+            return (
+              <div key={item.id} className="flex justify-between items-center">
+                <p className="font-medium text-gray-800">{item.quantity}x {item.item_name}</p>
+                <p className="text-amber-600 font-semibold">${(item.item_price * item.quantity).toFixed(2)}</p>
+              </div>
+            )
+          })}
+          <div className="border-t pt-3 flex justify-between">
+            <span className="font-bold">Total</span>
+            <span className="font-bold text-amber-600">${order.total}</span>
+          </div>
+        </div>
+      </div>
+
+      {order.status === 'served' && (
+        <div className="space-y-3">
+          
+            href={'/bill/' + order.id}
+            className="block w-full bg-amber-500 text-white text-center py-4 rounded-xl font-semibold"
+          >
+            Request Bill
+          </a>
+          
+            href={'/feedback/' + order.id}
+            className="block w-full bg-gray-100 text-gray-600 text-center py-4 rounded-xl font-semibold"
+          >
+            Leave Feedback
+          </a>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default OrderStatusTracker
