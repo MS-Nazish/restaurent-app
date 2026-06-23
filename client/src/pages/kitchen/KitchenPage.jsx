@@ -142,15 +142,18 @@ export default function KitchenPage() {
   }, [])
 
  async function updateStatus(orderId, status) {
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: status })
-      .eq('id', orderId)
-    
-    if (error) {
-      console.error('Error updating status:', error)
-    } else {
+    try {
+      await fetch(
+        import.meta.env.VITE_API_URL + '/api/orders/' + orderId + '/status',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: status }),
+        }
+      )
       fetchOrders()
+    } catch (err) {
+      console.error('Error updating status:', err)
     }
   }
   const handleMarkPreparing = function(orderId) { updateStatus(orderId, 'preparing') }
